@@ -9,16 +9,20 @@ const ARTICLE_LIST_KEY = "b";
 
 export let articleList = writable([]);
 
-function ab2str(buf) {
-  return String.fromCharCode.apply(null, new Uint16Array(buf));
+function encodeB64(input: Uint8Array) {
+  const b64encoded = btoa(String.fromCharCode.apply(null, input));
+  return b64encoded;
 }
-function str2ab(str) {
-  var buf = new ArrayBuffer(str.length * 2); // 2 bytes for each char
-  var bufView = new Uint16Array(buf);
-  for (var i = 0, strLen = str.length; i < strLen; i++) {
-    bufView[i] = str.charCodeAt(i);
-  }
-  return buf;
+
+function decodeB64(input: string) {
+  const u8_2 = new Uint8Array(
+    atob(input)
+      .split("")
+      .map(function (c) {
+        return c.charCodeAt(0);
+      })
+  );
+  return u8_2;
 }
 
 export class ArticleManager {
@@ -44,13 +48,7 @@ export class ArticleManager {
   static getArticle(id: number): IArticle {
     const article = localStorage.getItem(this.getId(id));
     if (!article) return null;
-    const u8_2 = new Uint8Array(
-      atob(article)
-        .split("")
-        .map(function (c) {
-          return c.charCodeAt(0);
-        })
-    );
+    const u8_2 = decodeB64(article);
     //@ts-ignore
     return BSON.deserialize(u8_2);
   }
@@ -58,14 +56,15 @@ export class ArticleManager {
   static updateArticle(id: number, updateArticle: IUpdateArticle) {
     const article = this.getArticle(id);
     const updated = { ...article, ...updateArticle };
-    localStorage.setItem(this.getId(id), JSON.stringify(updated));
+    const serialized = BSON.serialize(updated);
+    const encoded = encodeB64(serialized);
+    localStorage.setItem(this.getId(id), encoded);
   }
 
   static saveArticle(id: number, article: IArticle) {
     const serialized = BSON.serialize(article);
-    const b64encoded = btoa(String.fromCharCode.apply(null, serialized));
-    localStorage.setItem(this.getId(id), b64encoded);
-    // localStorage.setItem(this.getId(id), JSON.stringify(article));
+    const encoded = encodeB64(serialized);
+    localStorage.setItem(this.getId(id), encoded);
     const _articleList = this.getList();
     articleList.set([..._articleList, id]);
   }
